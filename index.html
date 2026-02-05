@@ -3,161 +3,254 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Color Battle P2P</title>
+    <title>Sensor Game Hub</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        body { font-family: sans-serif; background: #121212; color: white; text-align: center; margin: 0; padding: 20px; transition: 0.3s; }
-        .card { background: #1e1e1e; border: 1px solid #333; border-radius: 15px; padding: 20px; margin-bottom: 20px; }
-        .value { font-size: 1.8em; color: #00ff95; font-family: monospace; letter-spacing: 3px; margin: 10px 0; }
-        input { background: #000; border: 1px solid #444; color: white; padding: 15px; border-radius: 10px; width: 80%; font-size: 1.1em; text-align: center; margin-bottom: 10px; }
-        .btn { background: #3d5afe; color: white; border: none; padding: 15px 30px; border-radius: 10px; font-weight: bold; cursor: pointer; width: 100%; }
-        .btn:active { background: #1a237e; }
+        :root { --primary: #3d5afe; --bg: #0a0a0a; --card: #161616; --win: #4caf50; --lose: #f44336; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: #eee; margin: 0; padding: 15px; overflow-x: hidden; }
+        .screen { display: none; flex-direction: column; align-items: center; min-height: 90vh; }
+        .active { display: flex; }
+        .card { background: var(--card); border: 1px solid #333; border-radius: 15px; padding: 20px; width: 90%; max-width: 400px; margin: 10px 0; text-align: center; }
+        button { background: var(--primary); color: white; border: none; padding: 15px; border-radius: 10px; width: 100%; font-weight: bold; font-size: 1em; cursor: pointer; margin: 5px 0; }
+        button:disabled { background: #444; }
+        input { background: #000; border: 1px solid #444; color: white; padding: 15px; border-radius: 10px; width: 80%; text-align: center; font-size: 1.2em; margin-bottom: 10px; }
         
-        #game { display: none; }
-        #video { width: 100%; max-width: 400px; border-radius: 15px; border: 3px solid #333; transform: scaleX(-1); }
-        #color-target { height: 60px; border-radius: 10px; margin: 15px 0; line-height: 60px; font-weight: bold; font-size: 1.2em; text-shadow: 1px 1px 3px #000; border: 2px solid #fff; }
-        .aim { width: 30px; height: 30px; border: 2px solid white; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); border-radius: 50%; z-index: 5; pointer-events: none; }
-        .v-container { position: relative; display: inline-block; width: 100%; }
+        /* Цвета */
+        #video { width: 100%; border-radius: 10px; transform: scaleX(-1); }
+        .aim { width: 20px; height: 20px; border: 2px solid white; border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; }
         
-        .win-bg { background: #2e7d32 !important; }
-        .lose-bg { background: #c62828 !important; }
+        /* Шарик */
+        #balloon { background: #ff4081; border-radius: 50%; transition: width 0.1s, height 0.1s; margin: 20px auto; }
+        
+        /* Статус */
+        #status-msg { font-size: 1.5em; font-weight: bold; margin: 20px 0; }
     </style>
 </head>
 <body>
 
-    <div id="setup">
-        <h2>COLOR BATTLE ⚔️</h2>
-        
-        <div class="card">
-            <div style="color: #888; font-size: 0.8em;">ТВОЙ ID (ДИКТУЙ ДРУГУ)</div>
-            <div id="my-id" class="value">ЗАГРУЗКА...</div>
+<div id="screen-lobby" class="screen active">
+    <h2>GAME HUB ⚔️</h2>
+    
+    <div class="card" id="create-section">
+        <button onclick="showMyID()">СОЗДАТЬ КОМНАТУ (Я ХОСТ)</button>
+        <div id="id-area" style="display:none; margin-top:15px;">
+            <div style="font-size: 0.8em; color: #888;">ДИКТУЙ ЭТОТ ID ДРУГУ:</div>
+            <div id="my-id" style="font-size: 2em; color: var(--primary); font-family: monospace; font-weight: bold;">...</div>
+            <p style="font-size: 0.7em; color: #666;">Ждем, пока друг введет этот код...</p>
         </div>
-
-        <div class="card">
-            <input type="text" id="friend-id" placeholder="ВВЕДИ ID ДРУГА">
-            <button class="btn" onclick="connectToFriend()">ПРИСОЕДИНИТЬСЯ К ДРУГУ</button>
-        </div>
-        <p style="color: #666; font-size: 0.9em;">Для игры оба должны быть на этом сайте</p>
     </div>
 
-    <div id="game">
-        <div id="color-target">ИЩИ ЦВЕТ...</div>
-        <div class="v-container">
+    <div style="margin: 10px; font-weight: bold; color: #555;">ИЛИ</div>
+
+    <div class="card">
+        <input type="text" id="friend-id" placeholder="ВВЕДИ ID ХОСТА">
+        <button style="background: #444;" onclick="connectToFriend()">ВОЙТИ В КОМНАТУ</button>
+    </div>
+
+    <div id="host-controls" class="card" style="display:none; border-color: var(--primary);">
+        <h3 style="color: var(--primary); margin-top: 0;">ВЫБЕРИ ИГРУ:</h3>
+        <button onclick="sendGameSelect('color')">1. ЦВЕТОВАЯ ДУЭЛЬ</button>
+        <button onclick="sendGameSelect('steady')">2. АККУРАТНЫЙ ПОДЪЕМ</button>
+        <button onclick="sendGameSelect('balloon')">3. НАДУЙ ШАРИК</button>
+    </div>
+</div>
+
+    <div id="screen-color" class="screen">
+        <div id="color-target" style="padding: 20px; border-radius: 10px; margin-bottom: 10px; width: 100%;">ИЩИ ЦВЕТ!</div>
+        <div style="position: relative; width: 100%;">
             <video id="video" autoplay playsinline></video>
             <div class="aim"></div>
         </div>
-        <div id="status">Статус: В поиске...</div>
+    </div>
+
+    <div id="screen-steady" class="screen">
+        <h3>АККУРАТНЫЙ ПОДЪЕМ</h3>
+        <p id="steady-instr">Жди сигнала...</p>
+        <div id="steady-visual" style="font-size: 4em;">🧘</div>
+    </div>
+
+    <div id="screen-balloon" class="screen">
+        <h3>НАДУЙ ШАРИК</h3>
+        <p>Дуй в микрофон!</p>
+        <div id="balloon" style="width: 50px; height: 50px;"></div>
+    </div>
+
+    <div id="screen-result" class="screen">
+        <h1 id="result-title"></h1>
+        <button onclick="location.reload()">В МЕНЮ</button>
     </div>
 
     <canvas id="c" style="display:none;"></canvas>
 
     <script>
-        const colors = [
-            { name: 'КРАСНЫЙ', r: 210, g: 40, b: 40 },
-            { name: 'ЗЕЛЕНЫЙ', r: 40, g: 180, b: 40 },
-            { name: 'СИНИЙ', r: 40, g: 60, b: 200 },
-            { name: 'ЖЕЛТЫЙ', r: 230, g: 210, b: 20 }
-        ];
 
+function showMyID() {
+    document.getElementById('id-area').style.display = 'block';
+    // На всякий случай запрашиваем разрешения заранее
+    navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+        .then(s => s.getTracks().forEach(t => t.stop()));
+}
         let peer = new Peer();
-        let conn;
-        let targetColor = null;
-        let isGameOver = false;
-
-        // Инициализация ID
-        peer.on('open', (id) => {
-            document.getElementById('my-id').innerText = id;
-        });
-
-        // 1. ЛОГИКА ХОСТА (Ждем подключения)
-        peer.on('connection', (c) => {
+        let conn = null;
+        let isHost = false;
+        let sensorActive = false;
+        
+        // PeerJS Setup
+        peer.on('open', id => document.getElementById('my-id').innerText = id);
+        peer.on('connection', c => {
             conn = c;
-            console.log("Друг подключился!");
-            setupEvents();
-            
-            // Хост выбирает цвет и отправляет гостю
-            setTimeout(() => {
-                const randomColor = colors[Math.floor(Math.random() * colors.length)];
-                conn.send({ type: 'START', color: randomColor });
-                startGame(randomColor);
-            }, 1000);
+            isHost = true;
+            document.getElementById('host-controls').style.display = 'block';
+            setupConnection();
         });
 
-        // 2. ЛОГИКА ГОСТЯ (Подключаемся сами)
         function connectToFriend() {
             const fId = document.getElementById('friend-id').value;
-            if (!fId) return alert("Введи ID!");
-            
             conn = peer.connect(fId);
-            conn.on('open', () => {
-                console.log("Подключено к хосту");
-                setupEvents();
+            setupConnection();
+        }
+
+        function setupConnection() {
+            conn.on('data', data => {
+                if (data.type === 'GAME_SELECT') showGame(data.game, data.config);
+                if (data.type === 'WIN') showFinish('LOSE');
             });
         }
 
-        // Общие события для обоих
-        function setupEvents() {
-            conn.on('data', (data) => {
-                if (data.type === 'START') {
-                    startGame(data.color);
-                }
-                if (data.type === 'WIN') {
-                    isGameOver = true;
-                    document.body.classList.add('lose-bg');
-                    document.getElementById('status').innerText = "ТЫ ПРОИГРАЛ! 💀";
-                    if(navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 100]);
-                    setTimeout(() => location.reload(), 4000);
-                }
-            });
+        function sendGameSelect(game) {
+            let config = {};
+            if (game === 'color') config.color = [Math.random()*255, Math.random()*255, Math.random()*255];
+            conn.send({ type: 'GAME_SELECT', game, config });
+            showGame(game, config);
         }
 
-        async function startGame(selectedColor) {
-            targetColor = selectedColor;
-            document.getElementById('setup').style.display = 'none';
-            document.getElementById('game').style.display = 'block';
-            
-            const targetEl = document.getElementById('color-target');
-            targetEl.innerText = `БЫСТРЕЕ НАЙДИ: ${targetColor.name}`;
-            targetEl.style.backgroundColor = `rgb(${targetColor.r},${targetColor.g},${targetColor.b})`;
-
-            // Запуск камеры
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-                document.getElementById('video').srcObject = stream;
-                checkLoop();
-            } catch (e) {
-                alert("Нет доступа к камере");
-            }
+        // ПЕРЕКЛЮЧАТЕЛЬ ЭКРАНОВ
+        function showGame(game, config) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById('screen-' + game).classList.add('active');
+            if (game === 'color') startColorGame(config.color);
+            if (game === 'steady') startSteadyGame();
+            if (game === 'balloon') startBalloonGame();
         }
 
-        function checkLoop() {
+        // --- ИГРА 1: ЦВЕТА ---
+        async function startColorGame(target) {
             const v = document.getElementById('video');
+            const targetEl = document.getElementById('color-target');
+            targetEl.style.backgroundColor = `rgb(${target[0]}, ${target[1]}, ${target[2]})`;
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+            v.srcObject = stream;
+            
             const canvas = document.getElementById('c');
-            const ctx = canvas.getContext('2d', { willReadFrequently: true });
-
+            const ctx = canvas.getContext('2d');
             const interval = setInterval(() => {
-                if (isGameOver) return clearInterval(interval);
-
-                canvas.width = v.videoWidth / 8;
-                canvas.height = v.videoHeight / 8;
+                canvas.width = v.videoWidth/8; canvas.height = v.videoHeight/8;
                 ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
-                
-                // Берем пиксель из центра
                 const p = ctx.getImageData(canvas.width/2, canvas.height/2, 1, 1).data;
-                
-                // Простая проверка сходства (разница по RGB)
-                const diff = Math.abs(p[0] - targetColor.r) + Math.abs(p[1] - targetColor.g) + Math.abs(p[2] - targetColor.b);
-
-                if (diff < 100) { // Порог чувствительности
-                    isGameOver = true;
-                    conn.send({ type: 'WIN' });
-                    document.body.classList.add('win-bg');
-                    document.getElementById('status').innerText = "ТЫ ПОБЕДИЛ! 🏆";
-                    if(navigator.vibrate) navigator.vibrate(500);
-                    setTimeout(() => location.reload(), 4000);
+                const diff = Math.abs(p[0]-target[0]) + Math.abs(p[1]-target[1]) + Math.abs(p[2]-target[2]);
+                if (diff < 100) {
                     clearInterval(interval);
+                    sendWin();
                 }
             }, 200);
+        }
+
+        // --- ИГРА 2: АККУРАТНОСТЬ (1-2 Switch) ---
+        function startSteadyGame() {
+            let stage = 0; // 0: ждем, 1: поднимаем, 2: поворот, 3: опускаем
+            const instr = document.getElementById('steady-instr');
+            const visual = document.getElementById('steady-visual');
+            
+            setTimeout(() => {
+                instr.innerText = "ПОДНИМАЙ МЕДЛЕННО!";
+                stage = 1;
+                navigator.vibrate(200);
+            }, 3000);
+
+            window.addEventListener('devicemotion', (e) => {
+                if (stage === 0) return;
+                const acc = e.accelerationIncludingGravity;
+                const totalAcc = Math.abs(acc.x) + Math.abs(acc.y) + Math.abs(acc.z);
+                
+                // Если дернул слишком сильно (> 15 при норме 9.8)
+                if (totalAcc > 18) {
+                    stage = 0;
+                    alert("СЛИШКОМ РЕЗКО!");
+                    location.reload();
+                }
+            });
+
+            window.addEventListener('deviceorientation', (e) => {
+                if (stage === 1 && e.beta > 70) { // Примерный угол подъема
+                    stage = 2;
+                    instr.innerText = "ПЕРЕВЕРНИ ТЕЛЕФОН (ЭКРАНОМ ВНИЗ)";
+                    visual.innerText = "🔄";
+                }
+                if (stage === 2 && Math.abs(e.gamma) > 160) {
+                    stage = 3;
+                    instr.innerText = "ОПУСКАЙ НА СТОЛ";
+                    visual.innerText = "📉";
+                }
+                if (stage === 3 && e.beta < 20) {
+                    sendWin();
+                }
+            });
+        }
+
+        // --- ИГРА 3: ШАРИК ---
+        async function startBalloonGame() {
+            const b = document.getElementById('balloon');
+            let size = 50;
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const audioCtx = new AudioContext();
+            const source = audioCtx.createMediaStreamSource(stream);
+            const analyser = audioCtx.createAnalyser();
+            source.connect(analyser);
+            const data = new Uint8Array(analyser.frequencyBinCount);
+
+            function update() {
+                analyser.getByteFrequencyData(data);
+                const vol = data.reduce((a, b) => a + b) / data.length;
+                
+                if (vol > 30) {
+                    size += vol / 10;
+                    // Если дуть слишком сильно при большом размере - лопнет
+                    if (size > 250 && vol > 60) {
+                        alert("ЛОПНУЛ!");
+                        location.reload();
+                        return;
+                    }
+                    if (size > 320) {
+                        sendWin();
+                        return;
+                    }
+                }
+                b.style.width = size + 'px';
+                b.style.height = size + 'px';
+                requestAnimationFrame(update);
+            }
+            update();
+        }
+
+        // ФИНАЛ
+        function sendWin() {
+            conn.send('WIN');
+            showFinish('WIN');
+        }
+
+        function showFinish(res) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            const screen = document.getElementById('screen-result');
+            screen.classList.add('active');
+            const title = document.getElementById('result-title');
+            if (res === 'WIN') {
+                title.innerText = "ТЫ ПОБЕДИЛ! 🏆";
+                document.body.style.background = "var(--win)";
+            } else {
+                title.innerText = "ПРОИГРЫШ 💀";
+                document.body.style.background = "var(--lose)";
+            }
+            if(navigator.vibrate) navigator.vibrate(500);
         }
     </script>
 </body>
